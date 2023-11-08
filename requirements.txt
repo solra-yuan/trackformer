@@ -41,7 +41,6 @@ jupyter-core
 jupyterlab-pygments
 jupyterlab-widgets
 kiwisolver
-lapsolver
 lazy-object-proxy
 MarkupSafe
 matplotlib
