@@ -13,12 +13,10 @@ cycler
 Cython
 decorator
 defusedxml
-docopt
 entrypoint
 filelock
 flake8
 flake8-import-order
-future
 gdown
 gitdb
 GitPython
