@@ -13,12 +13,10 @@ cycler
 Cython
 decorator
 defusedxml
-docopt
 entrypoint
 filelock
 flake8
 flake8-import-order
-future
 gdown
 gitdb
 GitPython
@@ -43,8 +41,6 @@ jupyter-core
 jupyterlab-pygments
 jupyterlab-widgets
 kiwisolver
-lap
-lapsolver
 lazy-object-proxy
 MarkupSafe
 matplotlib
@@ -106,7 +102,6 @@ terminado
 testpath
 tifffile
 toml
-torchfile
 tornado
 tqdm
 traitlets
