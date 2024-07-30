@@ -98,10 +98,6 @@ def main(seed, obj_detect_checkpoint_file, tracker_cfg,
             obj_detect_checkpoint_file, map_location=lambda storage, loc: storage)
 
         obj_detect_state_dict = obj_detect_checkpoint['model']
-        # obj_detect_state_dict = {
-        #     k: obj_detect_state_dict[k] if k in obj_detect_state_dict
-        #     else v
-        #     for k, v in obj_detector.state_dict().items()}
 
         obj_detect_state_dict = {
             k.replace('detr.', ''): v
@@ -144,6 +140,7 @@ def main(seed, obj_detect_checkpoint_file, tracker_cfg,
     ))
 
     color_map = {}
+    prev_values = {}
     tracker.reset()
 
     while True:
@@ -157,25 +154,43 @@ def main(seed, obj_detect_checkpoint_file, tracker_cfg,
         img = Image.fromarray(img)
 
         batch = imgToBatch(img, transforms)
-        tracker.step(batch)
-        results = tracker.get_results()
-
+        with torch.no_grad():
+            tracker.step(batch)
+        results = tracker.get_results()       
         draw = ImageDraw.Draw(img)
 
-        for key in results:
-            item = results[key][0]
-            if key not in color_map:
-                random_color = (
-                    random.randint(0, 255),
-                    random.randint(0, 255),
-                    random.randint(0, 255)
-                )
-                color_map[key] = random_color
-            else:
-                random_color = color_map[key]
-            draw.rectangle(item['bbox'], outline=random_color, width=2)
+        last_values = {key: sub_dict[max(sub_dict.keys())] for key, sub_dict in results.items()}
+        
+        filtered_results = {}
+        for key2, value2 in last_values.items():
+            found_same_score = False
+            for key1, value1 in prev_values.items():
+                if value2['score'] == value1['score']:
+                    found_same_score = True
+                    break
+            if not found_same_score:
+                filtered_results[key2] = value2
+
+        for key in filtered_results:
+            result = results[key]
+            last_key = list(result.keys())[-1]
+            last_item = result[last_key]
+            if 'score' in last_item:
+                id = last_item['obj_ind']
+                if id not in color_map:                
+                    random_color = (
+                        random.randint(0, 255),
+                        random.randint(0, 255),
+                        random.randint(0, 255)
+                    )
+                    color_map[id] = random_color
+                else:
+                    random_color = color_map[id]
+                draw.rectangle(last_item['bbox'], outline=random_color, width=2)
+        
+        prev_values = last_values
+        torch.cuda.empty_cache()
 
         frame = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
         cv2.imshow('test', frame)
         cv2.waitKey(1)
-        del results

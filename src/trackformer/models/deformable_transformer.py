@@ -280,21 +280,23 @@ class DeformableTransformerEncoderLayer(nn.Module):
         return tensor if pos is None else tensor + pos
 
     def forward_ffn(self, src):
-        src2 = self.linear2(self.dropout2(self.activation(self.linear1(src))))
-        src = src + self.dropout3(src2)
-        src = self.norm2(src)
-        return src
+        layer1 = self.linear2(self.dropout2(self.activation(self.linear1(src))))
+        layer2 = src + self.dropout3(layer1)
+        layer3 = self.norm2(layer2)
+        return layer3
 
     def forward(self, src, pos, reference_points, spatial_shapes, padding_mask=None):
         # self attention
-        src2 = self.self_attn(self.with_pos_embed(src, pos), reference_points, src, spatial_shapes, padding_mask)
-        src = src + self.dropout1(src2)
-        src = self.norm1(src)
+        pos_embed = self.with_pos_embed(src, pos)
+        layer1 = self.self_attn(pos_embed, reference_points, src, spatial_shapes, padding_mask)
+        del pos_embed
+        layer2 = src + self.dropout1(layer1)
+        layer3 = self.norm1(layer2)
 
         # ffn
-        src = self.forward_ffn(src)
+        layer4 = self.forward_ffn(layer3)
 
-        return src
+        return layer4
 
 
 class DeformableTransformerEncoder(nn.Module):
@@ -322,7 +324,9 @@ class DeformableTransformerEncoder(nn.Module):
         output = src
         reference_points = self.get_reference_points(spatial_shapes, valid_ratios, device=src.device)
         for _, layer in enumerate(self.layers):
-            output = layer(output, pos, reference_points, spatial_shapes, padding_mask)
+            prev_ouput = output
+            output = layer(prev_ouput, pos, reference_points, spatial_shapes, padding_mask)            
+            del prev_ouput
 
         return output
 

@@ -141,22 +141,16 @@ class DeformableDETR(DETR):
         features, pos = self.backbone(samples)
 
         features_all = features
-        # pos_all = pos
-        # return_layers = {"layer2": "0", "layer3": "1", "layer4": "2"}
         features = features[-3:]
-        # pos = pos[-3:]
 
         if prev_features is None:
             prev_features = features
         else:
             prev_features = prev_features[-3:]
 
-        # srcs = []
-        # masks = []
         src_list = []
         mask_list = []
         pos_list = []
-        # for l, (feat, prev_feat) in enumerate(zip(features, prev_features)):
 
         frame_features = [prev_features, features]
         if not self.multi_frame_attention:
@@ -167,10 +161,6 @@ class DeformableDETR(DETR):
                 pos_list.extend([p[:, frame] for p in pos[-3:]])
             else:
                 pos_list.extend(pos[-3:])
-
-            # src, mask = feat.decompose()
-
-            # prev_src, _ = prev_feat.decompose()
 
             for l, feat in enumerate(frame_feat):
                 src, mask = feat.decompose()
@@ -183,32 +173,18 @@ class DeformableDETR(DETR):
 
                 mask_list.append(mask)
 
-            # if hasattr(self, 'merge_features'):
-            #     srcs.append(self.merge_features[l](torch.cat([self.input_proj[l](src), self.input_proj[l](prev_src)], dim=1)))
-            # else:
-            #     srcs.append(self.input_proj[l](src))
-
-            # masks.append(mask)
                 assert mask is not None
 
             if self.num_feature_levels > len(frame_feat):
                 _len_srcs = len(frame_feat)
                 for l in range(_len_srcs, self.num_feature_levels):
                     if l == _len_srcs:
-                        # src = self.input_proj[l](frame_feat[-1].tensors)
-                        # if hasattr(self, 'merge_features'):
-                        #     src = self.merge_features[l](torch.cat([self.input_proj[l](features[-1].tensors), self.input_proj[l](prev_features[-1].tensors)], dim=1))
-                        # else:
-                        #     src = self.input_proj[l](features[-1].tensors)
-
                         if self.merge_frame_features:
                             src = self.merge_features[l](torch.cat([self.input_proj[l](frame_feat[-1].tensors), self.input_proj[l](prev_features[-1].tensors)], dim=1))
                         else:
                             src = self.input_proj[l](frame_feat[-1].tensors)
                     else:
                         src = self.input_proj[l](src_list[-1])
-                        # src = self.input_proj[l](srcs[-1])
-                    # m = samples.mask
                     _, m = frame_feat[0].decompose()
                     mask = F.interpolate(m[None].float(), size=src.shape[-2:]).to(torch.bool)[0]
 
@@ -220,9 +196,7 @@ class DeformableDETR(DETR):
                     else:
                         pos_list.append(pos_l)
 
-        query_embeds = None
-        if not self.two_stage:
-            query_embeds = self.query_embed.weight
+        query_embeds = self.query_embed.weight if not self.two_stage else None
         hs, memory, init_reference, inter_references, enc_outputs_class, enc_outputs_coord_unact = \
             self.transformer(src_list, mask_list, pos_list, query_embeds, targets)
 
