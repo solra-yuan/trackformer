@@ -133,6 +133,8 @@ def main(seed, obj_detect_checkpoint_file, tracker_cfg,
     )
 
     cap = cv2.VideoCapture('./src/test2.mp4')
+    frame_skip=5
+    frame_count=0
     transforms = Compose(make_coco_transforms(
         'val',
         img_transform,
@@ -149,48 +151,49 @@ def main(seed, obj_detect_checkpoint_file, tracker_cfg,
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")
             break
+        if frame_count % frame_skip == 0:
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(img)
 
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = Image.fromarray(img)
+            batch = imgToBatch(img, transforms)
+            with torch.no_grad():
+                tracker.step(batch)
+            results = tracker.get_results()       
+            draw = ImageDraw.Draw(img)
 
-        batch = imgToBatch(img, transforms)
-        with torch.no_grad():
-            tracker.step(batch)
-        results = tracker.get_results()       
-        draw = ImageDraw.Draw(img)
+            last_values = {key: sub_dict[max(sub_dict.keys())] for key, sub_dict in results.items()}
+            
+            filtered_results = {}
+            for key2, value2 in last_values.items():
+                found_same_score = False
+                for key1, value1 in prev_values.items():
+                    if value2['score'] == value1['score']:
+                        found_same_score = True
+                        break
+                if not found_same_score:
+                    filtered_results[key2] = value2
 
-        last_values = {key: sub_dict[max(sub_dict.keys())] for key, sub_dict in results.items()}
-        
-        filtered_results = {}
-        for key2, value2 in last_values.items():
-            found_same_score = False
-            for key1, value1 in prev_values.items():
-                if value2['score'] == value1['score']:
-                    found_same_score = True
-                    break
-            if not found_same_score:
-                filtered_results[key2] = value2
+            for key in filtered_results:
+                result = results[key]
+                last_key = list(result.keys())[-1]
+                last_item = result[last_key]
+                if 'score' in last_item:
+                    id = last_item['obj_ind']
+                    if id not in color_map:                
+                        random_color = (
+                            random.randint(0, 255),
+                            random.randint(0, 255),
+                            random.randint(0, 255)
+                        )
+                        color_map[id] = random_color
+                    else:
+                        random_color = color_map[id]
+                    draw.rectangle(last_item['bbox'], outline=random_color, width=2)
+            
+            prev_values = last_values
+            torch.cuda.empty_cache()
 
-        for key in filtered_results:
-            result = results[key]
-            last_key = list(result.keys())[-1]
-            last_item = result[last_key]
-            if 'score' in last_item:
-                id = last_item['obj_ind']
-                if id not in color_map:                
-                    random_color = (
-                        random.randint(0, 255),
-                        random.randint(0, 255),
-                        random.randint(0, 255)
-                    )
-                    color_map[id] = random_color
-                else:
-                    random_color = color_map[id]
-                draw.rectangle(last_item['bbox'], outline=random_color, width=2)
-        
-        prev_values = last_values
-        torch.cuda.empty_cache()
-
-        frame = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-        cv2.imshow('test', frame)
-        cv2.waitKey(1)
+            frame = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+            cv2.imshow('test', frame)
+            cv2.waitKey(1)
+        frame_count += 1
