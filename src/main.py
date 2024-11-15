@@ -31,6 +31,7 @@ ex = sacred.Experiment('track')
 ex.add_config('cfgs/track.yaml')
 ex.add_named_config('reid', 'cfgs/track_reid.yaml')
 
+resize_size = (256, 256)
 
 random.seed(214)
 
@@ -152,7 +153,8 @@ def main(seed, obj_detect_checkpoint_file, tracker_cfg,
             print("Can't receive frame (stream end?). Exiting ...")
             break
         if frame_count % frame_skip == 0:
-            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            origin_img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img = cv2.resize(origin_img, resize_size)
             img = Image.fromarray(img)
 
             batch = imgToBatch(img, transforms)
